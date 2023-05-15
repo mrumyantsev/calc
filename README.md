@@ -7,7 +7,7 @@ In this console application you can calculate mathematical expressions like 1+1,
 # How to use it
 
 - Clone repo:
-`git clone ...`
+`git clone git@github.com:mrumyantsev/expr-calc.git`
 - (Optional) Download and unpack.
 - Open Go official website:
 `https://go.dev/dl/`
