@@ -10,29 +10,19 @@ import (
 )
 
 const (
-	opBr byte = '('
-	clBr byte = ')'
-	dot  byte = '.'
-	add  byte = '+'
-	sub  byte = '-'
-	mul  byte = '*'
-	div  byte = '/'
-	pow  byte = '^'
-	mod  byte = '%'
+	opBr = '('
+	clBr = ')'
+	dot  = '.'
+	add  = '+'
+	sub  = '-'
+	mul  = '*'
+	div  = '/'
+	pow  = '^'
+	mod  = '%'
 )
 
-type expressionCalculator interface {
-	run()
-}
-
-func PowerOn(e expressionCalculator) {
-	e.run()
-}
-
-// Engine.
-type calculatorCircuitBoard struct {
-	input  string
-	result string
+type Calc struct {
+	constants map[string]float64
 
 	errNo         int
 	lowBound      int
@@ -40,28 +30,27 @@ type calculatorCircuitBoard struct {
 	openBrackets  int
 	closeBrackets int
 
-	constants map[string]float64
+	input  string
+	result string
 }
 
-// Engine Constructor.
-func NewCalculatorCircuitBoard() *calculatorCircuitBoard {
-	constants := map[string]float64{}
-
-	constants["e"] = math.E
-	constants["pi"] = math.Pi
-	constants["phi"] = math.Phi
-
-	return &calculatorCircuitBoard{constants: constants}
+func New() *Calc {
+	return &Calc{
+		constants: map[string]float64{
+			"e":   math.E,
+			"pi":  math.Pi,
+			"phi": math.Phi,
+		},
+	}
 }
 
-func (c *calculatorCircuitBoard) run() {
+func (c *Calc) Start() {
 	for {
 		c.resetWorkValues()
 
 		fmt.Print("> ")
 
 		err := c.readInput()
-
 		if err != nil {
 			c.writeError()
 			continue
@@ -76,6 +65,7 @@ func (c *calculatorCircuitBoard) run() {
 		if c.isWrongCharsFound() ||
 			c.isInequalOpenCloseBackets() {
 			c.writeError()
+
 			continue
 		}
 
@@ -87,7 +77,7 @@ func (c *calculatorCircuitBoard) run() {
 	fmt.Println("Exited.")
 }
 
-func (c *calculatorCircuitBoard) resetWorkValues() {
+func (c *Calc) resetWorkValues() {
 	c.errNo = 0
 	c.lowBound = 0
 	c.highBound = 0
@@ -95,20 +85,22 @@ func (c *calculatorCircuitBoard) resetWorkValues() {
 	c.closeBrackets = 0
 }
 
-func (c *calculatorCircuitBoard) readInput() error {
+func (c *Calc) readInput() error {
 	var err error
-	reader := bufio.NewReader(os.Stdin)
-	c.input, err = reader.ReadString('\n')
 
+	reader := bufio.NewReader(os.Stdin)
+
+	c.input, err = reader.ReadString('\n')
 	if err != nil {
 		c.errNo = 3
+
 		return err
 	}
 
 	return nil
 }
 
-func (c *calculatorCircuitBoard) writeError() {
+func (c *Calc) writeError() {
 	var errorVerbose string
 
 	switch c.errNo {
@@ -129,22 +121,22 @@ func (c *calculatorCircuitBoard) writeError() {
 	fmt.Println("Error:", errorVerbose)
 }
 
-func (c *calculatorCircuitBoard) isUserWantExit() bool {
-	if c.input == "q" || c.input == "quit" || c.input == "exit" {
+func (c *Calc) isUserWantExit() bool {
+	if (c.input == "q") || (c.input == "quit") || (c.input == "exit") {
 		return true
 	}
 
 	return false
 }
 
-func (c *calculatorCircuitBoard) filterInput() {
+func (c *Calc) filterInput() {
 	c.input = strings.Replace(c.input, " ", "", -1)
 	c.input = strings.Replace(c.input, "\r", "", -1)
 	c.input = strings.Replace(c.input, "\n", "", -1)
 	c.input = strings.Replace(c.input, ",", ".", -1)
 }
 
-func (c *calculatorCircuitBoard) isWrongCharsFound() bool {
+func (c *Calc) isWrongCharsFound() bool {
 	var elem byte
 
 	for i := 0; i < len(c.input); i++ {
@@ -153,6 +145,7 @@ func (c *calculatorCircuitBoard) isWrongCharsFound() bool {
 		if !((elem == dot) || (elem == opBr) || (elem == clBr) ||
 			c.isAvailableDigit(elem) || c.isAvailableOp(elem)) {
 			c.errNo = 1
+
 			return true
 		}
 	}
@@ -160,12 +153,15 @@ func (c *calculatorCircuitBoard) isWrongCharsFound() bool {
 	return false
 }
 
-func (c *calculatorCircuitBoard) isInequalOpenCloseBackets() bool {
+func (c *Calc) isInequalOpenCloseBackets() bool {
+	var elem string
+
 	c.openBrackets = 0
 	c.closeBrackets = 0
 
 	for i := 0; i < len(c.input); i++ {
-		elem := string(c.input[i])
+		elem = string(c.input[i])
+
 		if elem == ")" {
 			c.closeBrackets++
 		} else if elem == "(" {
@@ -175,30 +171,37 @@ func (c *calculatorCircuitBoard) isInequalOpenCloseBackets() bool {
 
 	if c.openBrackets != c.closeBrackets {
 		c.errNo = 2
+
 		return true
 	}
 
 	return false
 }
 
-func (c *calculatorCircuitBoard) workWithExpr() {
+func (c *Calc) workWithExpr() {
 	for c.closeBrackets > 0 {
 		c.performBracketOp()
+
 		c.closeBrackets--
 	}
 
 	c.result = c.input
+
 	c.calculateExpr()
+
 	c.input = c.result
 }
 
-func (c *calculatorCircuitBoard) changeConstantsNamesToValues() {
+func (c *Calc) changeConstantsNamesToValues() {
 	for name, val := range c.constants {
 		var count int
-		var nameLen, valLen int = len(name), len(c.input)
+		var word string
+
+		nameLen, valLen := len(name), len(c.input)
 
 		for i := 0; i < valLen-(nameLen-1); i++ {
-			var word string = c.input[i : i+nameLen]
+			word = c.input[i : i+nameLen]
+
 			if word == name {
 				count++
 			}
@@ -206,47 +209,61 @@ func (c *calculatorCircuitBoard) changeConstantsNamesToValues() {
 
 		for count > 0 {
 			for i := 0; i < valLen-(nameLen-1); i++ {
-				var word string = c.input[i : i+nameLen]
+				word = c.input[i : i+nameLen]
+
 				if word == name {
-					c.input = c.input[:i] + strconv.FormatFloat(val, 'f', -1, 64) +
+					c.input = c.input[:i] +
+						strconv.FormatFloat(val, 'f', -1, 64) +
 						c.input[i+nameLen:]
+
 					break
 				}
 			}
+
 			count--
 		}
 	}
 }
 
-func (c *calculatorCircuitBoard) performBracketOp() {
+func (c *Calc) performBracketOp() {
+	var elem string
+
 	lenOfValue := len(c.input)
 
 	for j := 0; j < lenOfValue; j++ {
-		elem := string(c.input[j])
+		elem = string(c.input[j])
+
 		if elem == ")" {
 			c.closeBrackets = j
 
 			for i := j - 1; i >= 0; i-- {
-				elem := string(c.input[i])
+				elem = string(c.input[i])
+
 				if elem == "(" {
 					c.openBrackets = i
+
 					break
 				}
 			}
+
 			break
 		}
 	}
 
 	c.result = c.input[c.openBrackets+1 : c.closeBrackets]
+
 	c.calculateExpr()
+
 	c.input = c.input[:c.openBrackets] + c.result + c.input[c.closeBrackets+1:]
 }
 
-func (c *calculatorCircuitBoard) calculateExpr() {
+func (c *Calc) calculateExpr() {
+	var elem byte
 	var lowestOps, lowOps, highOps, highestOps int
 
 	for i := 0; i < len(c.result); i++ {
-		elem := c.result[i]
+		elem = c.result[i]
+
 		if elem == pow {
 			highestOps++
 		} else if (elem == mul) || (elem == div) {
@@ -260,30 +277,35 @@ func (c *calculatorCircuitBoard) calculateExpr() {
 
 	for highestOps > 0 {
 		c.performOp([]byte{pow})
+
 		highestOps--
 	}
 
 	for highOps > 0 {
 		c.performOp([]byte{mul, div})
+
 		highOps--
 	}
 
 	for lowOps > 0 {
 		c.performOp([]byte{add, sub})
+
 		lowOps--
 	}
 
 	for lowestOps > 0 {
 		c.performOp([]byte{mod})
+
 		lowestOps--
 	}
 }
 
-func (c *calculatorCircuitBoard) performOp(opsToCalc []byte) {
+func (c *Calc) performOp(opsToCalc []byte) {
+	var elem byte
 	var passToDoOp bool
 
 	for j := 0; j < len(c.result); j++ {
-		elem := c.result[j]
+		elem = c.result[j]
 
 		for _, op := range opsToCalc {
 			if elem == op {
@@ -295,7 +317,7 @@ func (c *calculatorCircuitBoard) performOp(opsToCalc []byte) {
 			var i int
 
 			for i = j - 1; i >= 0; i-- {
-				elem := c.result[i]
+				elem = c.result[i]
 
 				if c.isAvailableOp(elem) {
 					break
@@ -309,7 +331,7 @@ func (c *calculatorCircuitBoard) performOp(opsToCalc []byte) {
 			}
 
 			for i = j + 1; i < len(c.result); i++ {
-				elem := c.result[i]
+				elem = c.result[i]
 
 				if c.isAvailableOp(elem) {
 					break
@@ -326,18 +348,20 @@ func (c *calculatorCircuitBoard) performOp(opsToCalc []byte) {
 	c.result = c.result[:c.lowBound] + binOp + c.result[c.highBound+1:]
 }
 
-func (c *calculatorCircuitBoard) doBinaryOp(binExpr string) string {
+func (c *Calc) doBinaryOp(binExpr string) string {
+	var elem byte
 	var operatorChar byte
 	var operatorPos int
 	var resultf float64
 	var err error
 
 	for i := 0; i < len(binExpr); i++ {
-		elem := binExpr[i]
+		elem = binExpr[i]
 
 		if c.isAvailableOp(elem) {
 			operatorChar = elem
 			operatorPos = i
+
 			break
 		}
 	}
@@ -346,10 +370,16 @@ func (c *calculatorCircuitBoard) doBinaryOp(binExpr string) string {
 	operand2 := binExpr[operatorPos+1:]
 
 	operand1f, err := strconv.ParseFloat(operand1, 64)
-	operand2f, err := strconv.ParseFloat(operand2, 64)
-
 	if err != nil {
 		c.errNo = 4
+
+		return ""
+	}
+
+	operand2f, err := strconv.ParseFloat(operand2, 64)
+	if err != nil {
+		c.errNo = 4
+
 		return ""
 	}
 
@@ -365,6 +395,7 @@ func (c *calculatorCircuitBoard) doBinaryOp(binExpr string) string {
 			resultf = operand1f / operand2f
 		} else {
 			c.errNo = 5
+
 			return ""
 		}
 	case pow:
@@ -373,16 +404,18 @@ func (c *calculatorCircuitBoard) doBinaryOp(binExpr string) string {
 		resultf = math.Mod(operand1f, operand2f)
 	default:
 		c.errNo = 1
+
 		return ""
 	}
 
 	if math.Mod(resultf, 1.0) > 0.0 {
 		return strconv.FormatFloat(resultf, 'f', 15, 64)
 	}
+
 	return fmt.Sprintf("%.0f", resultf)
 }
 
-func (c *calculatorCircuitBoard) isAvailableOp(symbol byte) bool {
+func (c *Calc) isAvailableOp(symbol byte) bool {
 	if (symbol == add) || (symbol == sub) || (symbol == mul) ||
 		(symbol == div) || (symbol == pow) || (symbol == mod) {
 		return true
@@ -391,7 +424,7 @@ func (c *calculatorCircuitBoard) isAvailableOp(symbol byte) bool {
 	return false
 }
 
-func (c *calculatorCircuitBoard) isAvailableDigit(symbol byte) bool {
+func (c *Calc) isAvailableDigit(symbol byte) bool {
 	if (symbol >= '0') && (symbol <= '9') {
 		return true
 	}
@@ -399,7 +432,7 @@ func (c *calculatorCircuitBoard) isAvailableDigit(symbol byte) bool {
 	return false
 }
 
-func (c *calculatorCircuitBoard) writeResult() {
+func (c *Calc) writeResult() {
 	if strings.Contains(c.input, ".") {
 		for {
 			if string(c.input[len(c.input)-1]) == "0" {
@@ -410,7 +443,7 @@ func (c *calculatorCircuitBoard) writeResult() {
 		}
 	}
 
-	if c.input == "0." || c.input == "." {
+	if (c.input == "0.") || (c.input == ".") {
 		c.input = "0"
 	}
 
